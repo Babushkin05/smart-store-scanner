@@ -158,6 +158,8 @@ def capture_preview():
 
 if __name__ == '__main__':
     eng = get_engine()
+    eng.load()  # pre-load model + warmup at startup, not first scan
+    cam = get_camera()  # init camera early
 
     logger.info('=' * 50)
     logger.info('Smart Store Scanner')
@@ -165,7 +167,7 @@ if __name__ == '__main__':
     logger.info(f'  Model:     {MODEL_PATH}')
     logger.info(f'  Labels:    {len(eng._labels)} classes')
     logger.info(f'  Server:    {SERVER_URL}')
-    logger.info(f'  Camera:    {get_camera()._backend}')
+    logger.info(f'  Camera:    {cam._backend}')
     logger.info('=' * 50)
 
     app.run(host='0.0.0.0', port=5000, debug=False)

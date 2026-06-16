@@ -79,10 +79,12 @@ class InferenceEngine:
         """Load ONNX model via tbn (skipped in demo mode)."""
         if self._demo_mode:
             return
-        # Use tune tiling params for Raspberry Pi
         self._model = tbn.load_model(str(self.model_path),
                                      mblk=128, nblk=256, kblk=256,
                                      mmk=16, nmk=16)
+        # Warmup: first inference compiles kernels and prepares memory pools
+        dummy = np.zeros((1, 3, 256, 256), dtype=np.float32)
+        self._model.run(dummy)
         logger.info(f'Model loaded: {len(self._labels)} classes')
 
     def preprocess(self, image: np.ndarray) -> np.ndarray:
