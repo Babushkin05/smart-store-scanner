@@ -11,9 +11,10 @@ import os
 import sys
 from pathlib import Path
 
+import cv2
 import numpy as np
 import requests
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, send_file
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -102,6 +103,11 @@ def scan():
         image = cam.capture()
         logger.info(f'Captured: {image.shape}')
 
+        # Save for preview
+        _capture_path = BASE_DIR / 'static' / 'capture.jpg'
+        _capture_path.parent.mkdir(exist_ok=True)
+        cv2.imwrite(str(_capture_path), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+
         # 2. Infer
         eng = get_engine()
         result = eng.predict(image)
@@ -137,6 +143,15 @@ def scan():
 @app.route('/last')
 def last():
     return jsonify(_last_result or {})
+
+
+@app.route('/capture.jpg')
+def capture_preview():
+    """Serve the last captured frame so the UI can show it."""
+    capture_path = BASE_DIR / 'static' / 'capture.jpg'
+    if capture_path.exists():
+        return send_file(str(capture_path), mimetype='image/jpeg')
+    return '', 404
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────

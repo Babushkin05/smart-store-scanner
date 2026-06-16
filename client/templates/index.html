@@ -82,6 +82,15 @@
             cursor: not-allowed;
         }
 
+        /* ── Capture preview ───────────────────────────── */
+        .capture-preview {
+            margin-top: 16px;
+            max-width: 100%;
+            border-radius: 12px;
+            display: none;
+        }
+        .capture-preview.show { display: block; }
+
         /* ── History ────────────────────────────────────── */
         .history {
             margin-top: 32px;
@@ -134,6 +143,8 @@
 
     <button class="scan-btn" id="scanBtn" onclick="doScan()">Scan Product</button>
 
+    <img class="capture-preview" id="capturePreview" src="" alt="Captured frame">
+
     <div class="history" id="history"></div>
 
 <script>
@@ -167,6 +178,11 @@ async function doScan() {
         const card = document.getElementById('card');
         card.classList.add('scanned');
         setTimeout(() => card.classList.remove('scanned'), 600);
+
+        // Show captured frame (with cache-buster)
+        const preview = document.getElementById('capturePreview');
+        preview.src = '/capture.jpg?' + Date.now();
+        preview.classList.add('show');
 
         // Add to history
         history.unshift(data);
