@@ -1,0 +1,8 @@
+torch>=2.1
+torchvision>=0.16
+onnx>=1.14
+numpy>=1.24
+kagglehub>=0.1
+matplotlib>=3.7
+seaborn>=0.12
+pillow>=10.0

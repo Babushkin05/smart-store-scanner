@@ -5,8 +5,9 @@
 
 ## Context
 
-Need an image classification model for 8 product classes (cucumber, tomato,
-apple, banana, bell pepper, carrot, lemon, orange). The model must:
+Need an image classification model for 15 vegetable classes: Bean, Bitter_Gourd,
+Bottle_Gourd, Brinjal, Broccoli, Cabbage, Capsicum, Carrot, Cauliflower,
+Cucumber, Papaya, Potato, Pumpkin, Radish, Tomato. The model must:
 1. Be compatible with `tbn-runtime` operator set.
 2. Be small enough for Raspberry Pi (target: <5 MB, <100ms inference).
 3. Achieve reasonable accuracy on the limited classes.
@@ -31,7 +32,7 @@ Input [3, 224, 224]
   Block5: Conv(256→512, k3, pad1) → ReLU              → [512, 14, 14]
   GlobalAveragePool → [512]
   Dropout(0.5) — inference only (evaluated mode = identity)
-  Linear(512→8) → [8 classes]
+  Linear(512→15) → [15 классов]
 ```
 
 All operators map directly to supported ONNX ops:
@@ -48,8 +49,8 @@ No BatchNorm is used — the model relies on proper weight initialization
 
 ## Training strategy
 
-- **Dataset:** Fruits-360 on Kaggle (or similar fruit/vegetable dataset).
-  Script accepts any ImageFolder-structured dataset.
+- **Dataset:** `misrakahmed/vegetable-image-dataset` (Kaggle) — 15 classes,
+  21,000 images, 224×224, balanced (1000/200/200 per class per split).
 - **Augmentation:** RandomHorizontalFlip, RandomRotation(±15°), ColorJitter.
 - **Loss:** CrossEntropyLoss.
 - **Optimizer:** Adam, lr=1e-3, ReduceLROnPlateau scheduler.

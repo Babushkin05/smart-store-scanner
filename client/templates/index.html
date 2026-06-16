@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smart Store Scanner</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 24px;
+            color: #e94560;
+        }
+
+        /* ── Product card ──────────────────────────────── */
+        .card {
+            background: #16213e;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .card.scanned {
+            transform: scale(1.03);
+            box-shadow: 0 14px 50px rgba(233,69,96,0.3);
+        }
+        .emoji {
+            font-size: 7rem;
+            line-height: 1.2;
+        }
+        .product-name {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 8px 0;
+        }
+        .price {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #0f3460;
+            background: #e94560;
+            display: inline-block;
+            padding: 6px 28px;
+            border-radius: 40px;
+            margin: 12px 0;
+        }
+        .meta {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        /* ── Scan button ───────────────────────────────── */
+        .scan-btn {
+            margin-top: 28px;
+            padding: 16px 48px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: #e94560;
+            color: #fff;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.15s;
+        }
+        .scan-btn:hover { background: #c73652; }
+        .scan-btn:active { transform: scale(0.96); }
+        .scan-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        /* ── History ────────────────────────────────────── */
+        .history {
+            margin-top: 32px;
+            width: 100%;
+            max-width: 420px;
+        }
+        .history h2 {
+            font-size: 1.2rem;
+            color: #888;
+            margin-bottom: 12px;
+        }
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: #16213e;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+        .history-item .h-emoji { font-size: 1.8rem; }
+        .history-item .h-name { flex: 1; font-weight: 600; }
+        .history-item .h-price { color: #e94560; font-weight: 700; }
+
+        /* ── Spinner ────────────────────────────────────── */
+        .spinner {
+            display: none;
+            width: 40px; height: 40px;
+            border: 4px solid #333;
+            border-top-color: #e94560;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 16px auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <h1>Smart Scanner</h1>
+
+    <div class="card" id="card">
+        <div class="emoji" id="emoji">📷</div>
+        <div class="product-name" id="productName">Ready to scan</div>
+        <div class="price" id="price">—</div>
+        <div class="meta" id="meta"></div>
+        <div class="spinner" id="spinner"></div>
+    </div>
+
+    <button class="scan-btn" id="scanBtn" onclick="doScan()">Scan Product</button>
+
+    <div class="history" id="history"></div>
+
+<script>
+let history = [];
+
+async function doScan() {
+    const btn = document.getElementById('scanBtn');
+    const spinner = document.getElementById('spinner');
+    btn.disabled = true;
+    spinner.style.display = 'block';
+
+    try {
+        const resp = await fetch('/scan', { method: 'POST' });
+        const data = await resp.json();
+
+        if (data.error) {
+            alert('Scan failed: ' + data.error);
+            return;
+        }
+
+        // Update card
+        document.getElementById('emoji').textContent = emojiFor(data.class_name);
+        document.getElementById('productName').textContent = fmtName(data.class_name);
+        document.getElementById('price').textContent =
+            data.price ? data.price + ' \u20BD' : '—';
+        document.getElementById('meta').textContent =
+            `confidence: ${(data.confidence * 100).toFixed(0)}% · ` +
+            `${data.inference_ms}ms`;
+
+        // Animate
+        const card = document.getElementById('card');
+        card.classList.add('scanned');
+        setTimeout(() => card.classList.remove('scanned'), 600);
+
+        // Add to history
+        history.unshift(data);
+        if (history.length > 20) history.pop();
+        renderHistory();
+
+    } catch (e) {
+        alert('Error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        spinner.style.display = 'none';
+    }
+}
+
+function renderHistory() {
+    const h = document.getElementById('history');
+    if (history.length === 0) { h.innerHTML = ''; return; }
+
+    h.innerHTML = '<h2>Scan History</h2>' + history.map((item, i) => `
+        <div class="history-item">
+            <span class="h-emoji">${emojiFor(item.class_name)}</span>
+            <span class="h-name">${fmtName(item.class_name)}</span>
+            <span class="h-price">${item.price ? item.price + ' \u20BD' : ''}</span>
+        </div>
+    `).join('');
+}
+
+const EMOJIS = {
+    bean:'🫘', bitter_gourd:'🥒', bottle_gourd:'🫗', brinjal:'🍆',
+    broccoli:'🥦', cabbage:'🥬', capsicum:'🫑', carrot:'🥕',
+    cauliflower:'🥦', cucumber:'🥒', papaya:'🥭', potato:'🥔',
+    pumpkin:'🎃', radish:'🫒', tomato:'🍅',
+};
+
+function emojiFor(cls) {
+    return EMOJIS[cls] || '📦';
+}
+
+function fmtName(cls) {
+    return (cls || 'Unknown')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
+</script>
+</body>
+</html>

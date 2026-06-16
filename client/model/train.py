@@ -142,12 +142,9 @@ def validate(model, loader, criterion, device):
 
 
 def train_model(data_dir, epochs, batch_size, lr, device, save_dir):
-    """Train the model on an ImageFolder dataset."""
+    """Train the model using pre-split train/validation folders."""
 
-    # Data transforms
     train_transform = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.RandomCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(15),
         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
@@ -157,33 +154,29 @@ def train_model(data_dir, epochs, batch_size, lr, device, save_dir):
     ])
 
     val_transform = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
     ])
 
-    # Load dataset
-    full_dataset = datasets.ImageFolder(data_dir, transform=train_transform)
+    # Load pre-split dataset
+    train_dir = os.path.join(data_dir, 'train')
+    val_dir = os.path.join(data_dir, 'validation')
+
+    train_dataset = datasets.ImageFolder(train_dir, transform=train_transform)
+    val_dataset = datasets.ImageFolder(val_dir, transform=val_transform)
 
     # Save class labels
     labels_path = os.path.join(save_dir, 'labels.txt')
     with open(labels_path, 'w') as f:
-        for cls_name in full_dataset.classes:
+        for cls_name in train_dataset.classes:
             f.write(f"{cls_name}\n")
-    print(f"Labels saved to {labels_path}: {full_dataset.classes}")
+    print(f"Labels saved to {labels_path}: {train_dataset.classes}")
 
-    num_classes = len(full_dataset.classes)
-    print(f"Found {len(full_dataset)} images in {num_classes} classes")
-
-    # Split
-    val_size = max(int(0.2 * len(full_dataset)), num_classes)
-    train_size = len(full_dataset) - val_size
-    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
-
-    # Validation set uses val_transform
-    val_dataset.dataset.transform = val_transform
+    num_classes = len(train_dataset.classes)
+    print(f"Train: {len(train_dataset)} images, "
+          f"Val: {len(val_dataset)} images, "
+          f"{num_classes} classes")
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
                               shuffle=True, num_workers=2, pin_memory=True)
@@ -248,7 +241,7 @@ def train_model(data_dir, epochs, batch_size, lr, device, save_dir):
 
 def train_synthetic(save_dir, device):
     """Create a model with random weights for pipeline testing."""
-    num_classes = 8
+    num_classes = 15
     model = FruitCNN(num_classes=num_classes).to(device)
     model.eval()
 
@@ -280,6 +273,8 @@ def main():
     )
     parser.add_argument('--data_dir', type=str, default=None,
                         help='Path to ImageFolder dataset')
+    parser.add_argument('--kaggle', action='store_true',
+                        help='Auto-download vegetable-image-dataset from Kaggle')
     parser.add_argument('--synthetic', action='store_true',
                         help='Generate untrained model for testing')
     parser.add_argument('--epochs', type=int, default=30,
@@ -309,23 +304,26 @@ def main():
         device = torch.device('cpu')
     print(f"Using device: {device}")
 
-    if args.synthetic:
+    # Resolve dataset
+    data_dir = args.data_dir
+    if args.kaggle:
+        import kagglehub
+        kaggle_path = kagglehub.dataset_download('misrakahmed/vegetable-image-dataset')
+        data_dir = os.path.join(kaggle_path, 'Vegetable Images')
+        print(f"Dataset: {data_dir}")
+    elif args.synthetic:
         train_synthetic(save_dir, device)
-    elif args.data_dir:
-        train_model(args.data_dir, args.epochs, args.batch_size,
-                    args.lr, device, save_dir)
-    else:
-        print("ERROR: Specify --data_dir or --synthetic")
-        print("\nDataset should be structured as:")
-        print("  data_dir/")
-        print("    apple/")
-        print("      img001.jpg")
-        print("      img002.jpg")
-        print("    banana/")
-        print("      ...")
-        print("\nRecommended: Fruits-360 dataset from Kaggle")
-        print("  https://www.kaggle.com/datasets/moltean/fruits")
+        return
+    elif not data_dir:
+        print("ERROR: Specify --data_dir, --kaggle, or --synthetic")
+        print("\nExamples:")
+        print("  python train.py --kaggle                # auto-download + train")
+        print("  python train.py --data_dir ./fruits/    # local dataset")
+        print("  python train.py --synthetic             # random weights for testing")
         sys.exit(1)
+
+    train_model(data_dir, args.epochs, args.batch_size,
+                args.lr, device, save_dir)
 
 
 if __name__ == '__main__':
