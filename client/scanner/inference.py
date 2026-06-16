@@ -6,6 +6,7 @@ Falls back to random predictions (demo mode) when tbn is not available.
 
 import logging
 import random
+import sys
 import time
 from pathlib import Path
 
@@ -19,11 +20,26 @@ STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 # ── tbn availability ─────────────────────────────────────────────────────────
 
+HAS_TBN = False
+
+# Auto-detect tbn from sibling fast-arm-tbcnn build directory
+_self = Path(__file__).resolve()
+_repo_root = _self.parent.parent.parent           # smart-store-scanner/
+_docs_dir = _repo_root.parent                      # docs/ (on Pi) or etc/ (on Mac)
+_tbn_candidates = [
+    _docs_dir / 'fast-arm-tbcnn' / 'build' / 'python',
+    _docs_dir / 'fast-arm-tbcnn' / 'tbn-runtime' / 'build' / 'python',
+    Path('/home/pi/docs/fast-arm-tbcnn/build/python'),
+]
+for _p in _tbn_candidates:
+    if _p.exists():
+        sys.path.insert(0, str(_p))
+
 try:
-    import tbn  # noqa: F401
+    import tbn as _tbn  # noqa: F401
     HAS_TBN = True
 except ImportError:
-    HAS_TBN = False
+    pass
 
 
 class InferenceEngine:
