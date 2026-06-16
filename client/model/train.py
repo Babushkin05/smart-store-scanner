@@ -44,27 +44,27 @@ class FruitCNN(nn.Module):
         super().__init__()
 
         self.features = nn.Sequential(
-            # Block 1: 3x224x224 → 128x112x112  (128 = 1x128)
+            # Block 1: 3x256x256 → 128x128x128  (128 = 1x128)
             nn.Conv2d(3, 128, kernel_size=3, padding=1, bias=True),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2),
 
-            # Block 2: 128x112x112 → 128x56x56
+            # Block 2: 128x128x128 → 128x64x64
             nn.Conv2d(128, 128, kernel_size=3, padding=1, bias=True),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2),
 
-            # Block 3: 128x56x56 → 256x28x28  (256 = 2x128)
+            # Block 3: 128x64x64 → 256x32x32  (256 = 2x128)
             nn.Conv2d(128, 256, kernel_size=3, padding=1, bias=True),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2),
 
-            # Block 4: 256x28x28 → 512x14x14  (512 = 4x128)
+            # Block 4: 256x32x32 → 512x16x16  (512 = 4x128)
             nn.Conv2d(256, 512, kernel_size=3, padding=1, bias=True),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2),
 
-            # Block 5: 512x14x14 → 512x14x14  (stay at 512)
+            # Block 5: 512x16x16 → 512x16x16  (stay at 512)
             nn.Conv2d(512, 512, kernel_size=3, padding=1, bias=True),
             nn.ReLU(inplace=True),
         )
@@ -145,7 +145,7 @@ def train_model(data_dir, epochs, batch_size, lr, device, save_dir):
     """Train the model using pre-split train/validation folders."""
 
     train_transform = transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((256, 256)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(15),
         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
@@ -155,7 +155,7 @@ def train_model(data_dir, epochs, batch_size, lr, device, save_dir):
     ])
 
     val_transform = transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((256, 256)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
@@ -220,7 +220,7 @@ def train_model(data_dir, epochs, batch_size, lr, device, save_dir):
 
     # Export to ONNX
     onnx_path = os.path.join(save_dir, 'fruits_model.onnx')
-    dummy_input = torch.randn(1, 3, 224, 224).to(device)
+    dummy_input = torch.randn(1, 3, 256, 256).to(device)
 
     torch.onnx.export(
         model,
@@ -249,7 +249,7 @@ def train_synthetic(save_dir, device):
     model.eval()
 
     onnx_path = os.path.join(save_dir, 'fruits_model.onnx')
-    dummy_input = torch.randn(1, 3, 224, 224).to(device)
+    dummy_input = torch.randn(1, 3, 256, 256).to(device)
 
     torch.onnx.export(
         model,

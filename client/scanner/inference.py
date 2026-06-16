@@ -89,7 +89,7 @@ class InferenceEngine:
         """RGB [H,W,3] → normalized [1,3,224,224] float32 tensor."""
         import cv2
 
-        img = cv2.resize(image, (224, 224), interpolation=cv2.INTER_LINEAR)
+        img = cv2.resize(image, (256, 256), interpolation=cv2.INTER_LINEAR)
         img = img.astype(np.float32) / 255.0
         img = (img - MEAN) / STD
         img = np.transpose(img, (2, 0, 1))        # HWC → CHW
