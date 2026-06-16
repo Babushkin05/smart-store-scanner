@@ -33,7 +33,7 @@ app = Flask(__name__)
 MODEL_PATH = os.environ.get('TBN_MODEL_PATH', str(MODEL_DIR / 'fruits_model.onnx'))
 LABELS_PATH = os.environ.get('TBN_LABELS_PATH', str(MODEL_DIR / 'labels.txt'))
 SERVER_URL = os.environ.get('SERVER_URL', 'http://127.0.0.1:8080')
-USE_QUANTIZATION = os.environ.get('TBN_QUANTIZATION', '1') == '1'
+USE_QUANTIZATION = os.environ.get('TBN_QUANTIZATION', '0') == '1'
 
 # Lazy init
 _camera: Camera | None = None
