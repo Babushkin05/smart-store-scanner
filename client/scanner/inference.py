@@ -114,7 +114,9 @@ class InferenceEngine:
             output = self._model.run(tensor)
 
         elapsed = time.perf_counter() - start
-        probs = self._softmax(output[0])
+        # Model outputs 128 logits (NEON constraint), only first N are real classes
+        num_classes = len(self._labels)
+        probs = self._softmax(output[0][:num_classes])
         idx = int(np.argmax(probs))
         confidence = float(probs[idx])
 

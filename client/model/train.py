@@ -44,35 +44,35 @@ class FruitCNN(nn.Module):
         super().__init__()
 
         self.features = nn.Sequential(
-            # Block 1: 3x224x224 → 32x112x112
-            nn.Conv2d(3, 32, kernel_size=3, padding=1, bias=True),
+            # Block 1: 3x224x224 → 128x112x112  (128 = 1x128)
+            nn.Conv2d(3, 128, kernel_size=3, padding=1, bias=True),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2),
 
-            # Block 2: 32x112x112 → 64x56x56
-            nn.Conv2d(32, 64, kernel_size=3, padding=1, bias=True),
+            # Block 2: 128x112x112 → 128x56x56
+            nn.Conv2d(128, 128, kernel_size=3, padding=1, bias=True),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2),
 
-            # Block 3: 64x56x56 → 128x28x28
-            nn.Conv2d(64, 128, kernel_size=3, padding=1, bias=True),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-
-            # Block 4: 128x28x28 → 256x14x14
+            # Block 3: 128x56x56 → 256x28x28  (256 = 2x128)
             nn.Conv2d(128, 256, kernel_size=3, padding=1, bias=True),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2),
 
-            # Block 5: 256x14x14 → 512x14x14
+            # Block 4: 256x28x28 → 512x14x14  (512 = 4x128)
             nn.Conv2d(256, 512, kernel_size=3, padding=1, bias=True),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),
+
+            # Block 5: 512x14x14 → 512x14x14  (stay at 512)
+            nn.Conv2d(512, 512, kernel_size=3, padding=1, bias=True),
             nn.ReLU(inplace=True),
         )
 
         self.pool = nn.AdaptiveAvgPool2d(1)  # → ONNX GlobalAveragePool
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(512, num_classes, bias=True),  # → ONNX Gemm
+            nn.Linear(512, 128, bias=True),  # 128 → pad to multiple of 128
         )
 
         self._init_weights()
@@ -98,7 +98,7 @@ class FruitCNN(nn.Module):
 # ── Training ─────────────────────────────────────────────────────────────────
 
 
-def train_epoch(model, loader, criterion, optimizer, device):
+def train_epoch(model, loader, criterion, optimizer, device, num_classes):
     model.train()
     total_loss = 0
     correct = 0
@@ -108,7 +108,7 @@ def train_epoch(model, loader, criterion, optimizer, device):
         images, labels = images.to(device), labels.to(device)
 
         optimizer.zero_grad()
-        outputs = model(images)
+        outputs = model(images)[:, :num_classes]  # only real classes
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
@@ -122,7 +122,7 @@ def train_epoch(model, loader, criterion, optimizer, device):
 
 
 @torch.no_grad()
-def validate(model, loader, criterion, device):
+def validate(model, loader, criterion, device, num_classes):
     model.eval()
     total_loss = 0
     correct = 0
@@ -130,7 +130,7 @@ def validate(model, loader, criterion, device):
 
     for images, labels in loader:
         images, labels = images.to(device), labels.to(device)
-        outputs = model(images)
+        outputs = model(images)[:, :num_classes]  # only real classes
         loss = criterion(outputs, labels)
 
         total_loss += loss.item() * images.size(0)
@@ -200,9 +200,9 @@ def train_model(data_dir, epochs, batch_size, lr, device, save_dir):
 
     for epoch in range(1, epochs + 1):
         train_loss, train_acc = train_epoch(
-            model, train_loader, criterion, optimizer, device
+            model, train_loader, criterion, optimizer, device, num_classes
         )
-        val_loss, val_acc = validate(model, val_loader, criterion, device)
+        val_loss, val_acc = validate(model, val_loader, criterion, device, num_classes)
         scheduler.step(val_loss)
 
         print(f"Epoch {epoch:2d}/{epochs} | "
@@ -230,6 +230,7 @@ def train_model(data_dir, epochs, batch_size, lr, device, save_dir):
         output_names=['output'],
         dynamic_axes={'input': {0: 'batch'}, 'output': {0: 'batch'}},
         opset_version=13,
+        dynamo=False,  # legacy exporter: single-file, GlobalAveragePool not ReduceMean
     )
 
     print(f"\nONNX model exported to: {onnx_path}")
@@ -258,6 +259,7 @@ def train_synthetic(save_dir, device):
         output_names=['output'],
         dynamic_axes={'input': {0: 'batch'}, 'output': {0: 'batch'}},
         opset_version=13,
+        dynamo=False,  # legacy exporter: single-file, GlobalAveragePool not ReduceMean
     )
 
     print(f"Synthetic (untrained) model exported to: {onnx_path}")
