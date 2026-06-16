@@ -1,9 +1,11 @@
 """Inference engine via tbn-runtime.
 
 Loads ONNX model, preprocesses images, runs ternary/binary inference.
+Falls back to random predictions (demo mode) when tbn is not available.
 """
 
 import logging
+import random
 import time
 from pathlib import Path
 
@@ -15,25 +17,52 @@ logger = logging.getLogger(__name__)
 MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
+# ── tbn availability ─────────────────────────────────────────────────────────
+
+try:
+    import tbn  # noqa: F401
+    HAS_TBN = True
+except ImportError:
+    HAS_TBN = False
+
 
 class InferenceEngine:
-    """tbn-runtime wrapper for vegetable classification."""
+    """tbn-runtime wrapper. Falls back to demo mode if tbn not installed."""
 
-    def __init__(self, model_path: str, labels_path: str,
+    def __init__(self, model_path: str = '', labels_path: str = '',
                  use_quantization: bool = True):
-        self.model_path = Path(model_path)
-        self.labels_path = Path(labels_path)
+        self.model_path = Path(model_path) if model_path else None
+        self.labels_path = Path(labels_path) if labels_path else None
         self.use_quantization = use_quantization
         self._labels = self._load_labels()
         self._model = None
+        self._demo_mode = not HAS_TBN or not model_path or not Path(model_path).exists()
+
+        if self._demo_mode:
+            logger.warning('Demo mode: using random predictions '
+                           f'(tbn_available={HAS_TBN}, '
+                           f'model_exists={Path(model_path).exists() if model_path else False})')
+        else:
+            logger.info(f'Live mode: {len(self._labels)} classes, '
+                        f'quantization={use_quantization}')
+
+    @property
+    def is_demo(self) -> bool:
+        return self._demo_mode
 
     def _load_labels(self) -> list:
-        with open(self.labels_path) as f:
-            return [line.strip() for line in f if line.strip()]
+        if self.labels_path and self.labels_path.exists():
+            with open(self.labels_path) as f:
+                return [line.strip() for line in f if line.strip()]
+        # Fallback labels
+        return ['Bean', 'Bitter_Gourd', 'Bottle_Gourd', 'Brinjal', 'Broccoli',
+                'Cabbage', 'Capsicum', 'Carrot', 'Cauliflower', 'Cucumber',
+                'Papaya', 'Potato', 'Pumpkin', 'Radish', 'Tomato']
 
     def load(self):
-        """Load ONNX model via tbn."""
-        import tbn
+        """Load ONNX model via tbn (skipped in demo mode)."""
+        if self._demo_mode:
+            return
         self._model = tbn.load_model(str(self.model_path))
         logger.info(f'Model loaded: {len(self._labels)} classes')
 
@@ -49,19 +78,23 @@ class InferenceEngine:
         return img.astype(np.float32)
 
     def predict(self, image: np.ndarray) -> dict:
-        """Run inference, return {class_name, confidence, inference_ms}."""
+        """Run inference. Returns random result in demo mode."""
+        start = time.perf_counter()
+
+        if self._demo_mode:
+            return self._predict_demo(start)
+
         if self._model is None:
             self.load()
 
         tensor = self.preprocess(image)
 
-        start = time.perf_counter()
         if self.use_quantization:
             output = self._model.run_quantized(tensor)
         else:
             output = self._model.run(tensor)
-        elapsed = time.perf_counter() - start
 
+        elapsed = time.perf_counter() - start
         probs = self._softmax(output[0])
         idx = int(np.argmax(probs))
         confidence = float(probs[idx])
@@ -70,6 +103,18 @@ class InferenceEngine:
             'class_name': self._labels[idx],
             'confidence': round(confidence, 4),
             'inference_ms': round(elapsed * 1000, 1),
+            'demo': False,
+        }
+
+    def _predict_demo(self, start_time: float) -> dict:
+        """Return a random prediction for demo/testing."""
+        idx = random.randint(0, len(self._labels) - 1)
+        elapsed = time.perf_counter() - start_time
+        return {
+            'class_name': self._labels[idx],
+            'confidence': round(random.uniform(0.70, 0.99), 4),
+            'inference_ms': round(elapsed * 1000, 1),
+            'demo': True,
         }
 
     @staticmethod
