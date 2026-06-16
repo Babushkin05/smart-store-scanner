@@ -79,7 +79,10 @@ class InferenceEngine:
         """Load ONNX model via tbn (skipped in demo mode)."""
         if self._demo_mode:
             return
-        self._model = tbn.load_model(str(self.model_path))
+        # Use mmk=1, nmk=1 to support small batch/class dimensions
+        self._model = tbn.load_model(str(self.model_path),
+                                     mblk=64, nblk=64, kblk=128,
+                                     mmk=1, nmk=1)
         logger.info(f'Model loaded: {len(self._labels)} classes')
 
     def preprocess(self, image: np.ndarray) -> np.ndarray:
