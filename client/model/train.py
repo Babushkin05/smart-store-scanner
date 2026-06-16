@@ -145,6 +145,7 @@ def train_model(data_dir, epochs, batch_size, lr, device, save_dir):
     """Train the model using pre-split train/validation folders."""
 
     train_transform = transforms.Compose([
+        transforms.Resize((224, 224)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(15),
         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
@@ -154,6 +155,7 @@ def train_model(data_dir, epochs, batch_size, lr, device, save_dir):
     ])
 
     val_transform = transforms.Compose([
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
@@ -179,9 +181,9 @@ def train_model(data_dir, epochs, batch_size, lr, device, save_dir):
           f"{num_classes} classes")
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-                              shuffle=True, num_workers=2, pin_memory=True)
+                              shuffle=True, num_workers=0)
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
-                            shuffle=False, num_workers=2, pin_memory=True)
+                            shuffle=False, num_workers=0)
 
     # Model
     model = FruitCNN(num_classes=num_classes).to(device)

@@ -36,7 +36,7 @@ for _p in _tbn_candidates:
         sys.path.insert(0, str(_p))
 
 try:
-    import tbn as _tbn  # noqa: F401
+    import tbn  # noqa: F401
     HAS_TBN = True
 except ImportError:
     pass
